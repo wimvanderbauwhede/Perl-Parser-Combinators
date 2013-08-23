@@ -1,0 +1,7 @@
+/Parser-Combinators-*
+/.build
+/_build*
+/Build
+MYMETA.*
+!META.json
+/.prove
