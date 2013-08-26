@@ -1,10 +1,10 @@
 {
-   "abstract" : "A library of building blocks for parsing, similar to Haskell's Parsec",
+   "abstract" : "A library of building blocks for parsing text",
    "author" : [
       "Wim Vanderbauwhede <Wim.Vanderbauwhede@gmail.com>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Dist::Milla version v1.0.3, Dist::Zilla version 4.300035, CPAN::Meta::Converter version 2.132140",
+   "generated_by" : "Dist::Milla version v1.0.4, Dist::Zilla version 4.300035, CPAN::Meta::Converter version 2.132140",
    "license" : [
       "perl_5"
    ],
@@ -46,6 +46,17 @@
       }
    },
    "release_status" : "stable",
-   "version" : "0.01"
+   "resources" : {
+      "bugtracker" : {
+         "web" : "https://github.com/wimvanderbauwhede/Perl-Parser-Combinators/issues"
+      },
+      "homepage" : "https://github.com/wimvanderbauwhede/Perl-Parser-Combinators",
+      "repository" : {
+         "type" : "git",
+         "url" : "https://github.com/wimvanderbauwhede/Perl-Parser-Combinators.git",
+         "web" : "https://github.com/wimvanderbauwhede/Perl-Parser-Combinators"
+      }
+   },
+   "version" : "0.02"
 }
 
