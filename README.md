@@ -21,8 +21,8 @@ well-defined items.
 
 ## Usage
 
-Each parser in this library , e.g. \`word\` or \`symbol\`, is a function that returns a function (actually, a closure) that parses a string. You can combine these parsers by using special
-parsers like \`sequence\` and \`choice\`. For example, a JavaScript variable declaration 
+Each parser in this library , e.g. `word` or `symbol`, is a function that returns a function (actually, a closure) that parses a string. You can combine these parsers by using special
+parsers like `sequence` and `choice`. For example, a JavaScript variable declaration 
 
      var res = 42;
 
@@ -37,7 +37,7 @@ could be parsed as:
             semi
         ]
 
-if you want to express that the assignment is optional, i.e. \` var res;\` is also valid, you can use \`maybe()\`:
+if you want to express that the assignment is optional, i.e. ` var res;` is also valid, you can use `maybe()`:
 
     my $p =
         sequence [
@@ -52,7 +52,7 @@ if you want to express that the assignment is optional, i.e. \` var res;\` is al
             semi
         ]
 
-If you want to parse alternatives you can use \`choice()\`. For example, to express that either of the next two lines are valid:
+If you want to parse alternatives you can use `choice()`. For example, to express that either of the next two lines are valid:
 
     42
     return(42)
@@ -122,17 +122,17 @@ Applying this parser returns a tuple as follows:
     my $str = 'integer(kind=8), '
     (my $status, my $rest, my $matches) = type_parser($str);
 
-Here,\`$status\` is 0 if the match failed, 1 if it succeeded.  \`$rest\` contains the rest of the string. 
+Here,`$status` is 0 if the match failed, 1 if it succeeded.  `$rest` contains the rest of the string. 
 The actual matches are stored in the array $matches. As every parser returns its resuls as an array ref, 
-$matches contains the concrete parsed syntax, i.e. a nested array of arrays of strings. 
+`$matches` contains the concrete parsed syntax, i.e. a nested array of arrays of strings. 
 
     Dumper($matches) ==> [{'Type' => 'integer'},['kind','\\=',{'Kind' => '8'}]]
 
-You can remove the unlabeled matches using \`getParseTree\`:
+You can remove the unlabeled matches and convert the raw tree into nested hashes using `getParseTree`:
 
     my $parse_tree = getParseTree($matches);
 
-    Dumper($parse_tree) ==> [{'Type' => 'integer'},{'Kind' => '8'}]
+    Dumper($parse_tree) ==> {'Type' => 'integer','Kind' => '8'}
 
 ## A more complete example
 
@@ -143,8 +143,8 @@ I wrote this library because I needed to parse argument declarations of Fortran-
       real(8), dimension(0:7,kp) :: f,g 
 
 I want to extract the type and kind, the dimension and the list of variable names. For completeness I'm parsing the \`intent\` attribute as well.
-The parser is a sequence of four separate parsers \`type\_parser\`, \`dim\_parser\`, \`intent\_parser\` and \`arglist\_parser\`.
-All the optional fields are wrapped in a \`maybe()\`.
+The parser is a sequence of four separate parsers `type_parser`, `dim_parser`, `intent_parser` and `arglist_parser`.
+All the optional fields are wrapped in a `maybe()`.
 
 
 
@@ -167,7 +167,7 @@ All the optional fields are wrapped in a \`maybe()\`.
         &arglist_parser
 	];
 
-\# where
+    # where
 
     sub type_parser {	
 		sequence [
@@ -204,23 +204,23 @@ All the optional fields are wrapped in a \`maybe()\`.
         ]
     }    
 
-Running the parser and calling getParseTree() om the first string results in 
+Running the parser and calling `getParseTree()` on the first string results in 
 
-    [
-    {'TypeTup' => [
-                {'Type' => 'integer'},
-                {'Kind' => '8'}
-            ]},
-    {'Dim' => ['0:ip','-1:jp+1','kp']},
-    {'Intent' => 'In'},
-    {'Vars' => ['u','v','w']}
-    ]
+    {
+    'TypeTup' => {
+                'Type' => 'integer',
+                'Kind' => '8'
+            },
+    'Dim' => ['0:ip','-1:jp+1','kp'],
+    'Intent' => 'In',
+    'Vars' => ['u','v','w']
+    }
 
 See the test fortran95\_argument\_declarations.t for the source code.    
 
 ### No Monads?!
 
-As this library is inspired by a monadic parser combinator library from Haskell, I have also implemented bindP() and returnP() for those who like monads ^\_^
+As this library is inspired by a monadic parser combinator library from Haskell, I have also implemented `bindP()` and `returnP()` for those who like monads ^\_^
 So instead of saying 
 
     my $pp = sequence [ $p1, $p2, $p3 ]
@@ -262,4 +262,4 @@ it under the same terms as Perl itself.
 
 # SEE ALSO
 
-\- The original Parsec library: http://legacy.cs.uu.nl/daan/download/parsec/parsec.html and http://hackage.haskell.org/package/parsec
+\- The original Parsec library: [http://legacy.cs.uu.nl/daan/download/parsec/parsec.html](http://legacy.cs.uu.nl/daan/download/parsec/parsec.html) and [http://hackage.haskell.org/package/parsec](http://hackage.haskell.org/package/parsec)

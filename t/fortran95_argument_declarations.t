@@ -87,9 +87,9 @@ my $str1 = '      integer(kind=8), dimension(0:ip, -1:jp+1, kp) , intent( In ) :
 my $str2 = '      real, dimension(0:7) :: f ';
 my $str3 = '      real(8), dimension(0:7,kp) :: f,g ';
 
-ok( test_parsetree( $F95_arg_decl_parser, $str1, "[{'TypeTup' => [{'Type' => 'integer'},{'Kind' => '8'}]},{'Dim' => ['0:ip','-1:jp+1','kp']},{'Intent' => 'In'},{'Vars' => ['u','v','w']}]" ) );
-ok( test_parsetree( $F95_arg_decl_parser, $str2, "[{'TypeTup' => [{'Type' => 'real'},'']},{'Dim' => '0:7'},{'Vars' => 'f'}]" ) );
-ok( test_parsetree( $F95_arg_decl_parser, $str3, "[{'TypeTup' => [{'Type' => 'real'},{'Kind' => '8'}]},{'Dim' => ['0:7','kp']},{'Vars' => ['f','g']}]" ) );
+ok( test_parsetree( $F95_arg_decl_parser, $str1,  "{'Intent' => 'In','Vars' => ['u','v','w'],'TypeTup' => {'Type' => 'integer','Kind' => '8'},'Dim' => ['0:ip','-1:jp+1','kp']}") );
+ok( test_parsetree( $F95_arg_decl_parser, $str2, "{'Vars' => 'f','TypeTup' => [{'Type' => 'real'},''],'Dim' => '0:7'}" ) );
+ok( test_parsetree( $F95_arg_decl_parser, $str3, "{'Vars' => ['f','g'],'TypeTup' => {'Type' => 'real','Kind' => '8'},'Dim' => ['0:7','kp']}" ) );
 
 
 done_testing;

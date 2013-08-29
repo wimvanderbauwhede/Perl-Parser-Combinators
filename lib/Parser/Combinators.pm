@@ -211,7 +211,6 @@ sub parens {
         (my $status, my $str, my $ch)=char('(')->($str);
         if ($status==1) {
             $str=~s/\s*//;
-            print "parens: <$str>\n" if $V;
             (my $st,$str,$matches)=$ref->($str); 
             print "parens: remainder => <$str>\n" if $V;
             print "parens: matches => [".Dumper($matches)."]\n" if $V;
@@ -521,11 +520,11 @@ sub empty {
 
 # This function returns labeled items in the parse tree.
 # It is rather aggressive in removing unlabeled items
-sub getParseTree { (my $list) = @_;
+sub get_tree_as_lists { (my $list) = @_;
     my $hlist=[];
     for my $elt (@{$list}) {
         if (ref($elt) eq 'ARRAY' and scalar @{$elt}>0) { # non-empty list
-            push @{ $hlist }, getParseTree($elt);
+            push @{ $hlist }, get_tree_as_lists($elt);
         } elsif (ref($elt) eq 'HASH') { # hash: need to process the rhs of the pair
             (my $k, my $v) = each %{$elt};
             if (ref($v) ne 'ARRAY') { # not an array => wrap in array and redo
@@ -536,9 +535,9 @@ sub getParseTree { (my $list) = @_;
                 my $pv =[
                     map {
                         if (ref($_) eq 'ARRAY') {
-                            getParseTree($_) 
+                            get_tree_as_lists($_) 
                         } elsif ( ref($_) eq 'HASH') {
-                            getParseTree([$_]) 
+                            get_tree_as_lists([$_]) 
                         } elsif (defined $_) { $_ } 
                     } @{$v} 
                 ];
@@ -548,6 +547,37 @@ sub getParseTree { (my $list) = @_;
     }
     return scalar @{$hlist}==1 ? $hlist->[0] : $hlist;
 }
+
+sub is_list_of_objects { (my $mlo) =$_;
+    if (ref($mlo) eq 'ARRAY') {
+        my @tmlo=@{$mlo};
+    my @l=grep { ref($_) ne 'HASH' } @tmlo;
+    return scalar(@l)?0:1;
+    } else {
+        return 0;
+    }
+}
+
+sub l2m { (my $hlist) =@_;
+        my $hmap = {};  
+        my @hmap_vals = map {  (my $k, my $v)=%{$_}; $v } @{$hlist};
+        my @hmap_keys = map {  (my $k, my $v)=%{$_}; $k } @{$hlist};
+        my @hmap_rvals = map { is_list_of_objects($_) ? l2m($_) : $_ } @hmap_vals;
+#        my @hmap_keys_vals = map {  each %{$_} } @{$hlist}
+        for my $k ( @hmap_keys ) {
+            my $rv = shift @hmap_rvals;
+            $hmap->{$k}=$rv;
+        }
+#        my %{$hmap} = @hmap_keys_vals;
+        return $hmap;
+}
+
+            
+        
+sub getParseTree { (my $m) =@_;
+    return l2m(get_tree_as_lists($m));
+}
+#    return ( (hlist.length==1) ? (head hlist) : hlist) # This just returns 'false' ...
 
 1;
 
@@ -577,8 +607,8 @@ well-defined items.
 
 =head2 Usage
 
-Each parser in this library , e.g. `word` or `symbol`, is a function that returns a function (actually, a closure) that parses a string. You can combine these parsers by using special
-parsers like `sequence` and `choice`. For example, a JavaScript variable declaration 
+Each parser in this library , e.g. C<word> or C<symbol>, is a function that returns a function (actually, a closure) that parses a string. You can combine these parsers by using special
+parsers like C<sequence> and C<choice>. For example, a JavaScript variable declaration 
 
      var res = 42;
 
@@ -593,7 +623,7 @@ could be parsed as:
             semi
         ]
 
-if you want to express that the assignment is optional, i.e. ` var res;` is also valid, you can use `maybe()`:
+if you want to express that the assignment is optional, i.e. C< var res;> is also valid, you can use C<maybe()>:
 
     my $p =
         sequence [
@@ -608,7 +638,7 @@ if you want to express that the assignment is optional, i.e. ` var res;` is also
             semi
         ]
 
-If you want to parse alternatives you can use `choice()`. For example, to express that either of the next two lines are valid:
+If you want to parse alternatives you can use C<choice()>. For example, to express that either of the next two lines are valid:
 
     42
     return(42)
@@ -676,17 +706,17 @@ Applying this parser returns a tuple as follows:
   my $str = 'integer(kind=8), '
   (my $status, my $rest, my $matches) = type_parser($str);
 
-Here,`$status` is 0 if the match failed, 1 if it succeeded.  `$rest` contains the rest of the string. 
+Here,C<$status> is 0 if the match failed, 1 if it succeeded.  C<$rest> contains the rest of the string. 
 The actual matches are stored in the array $matches. As every parser returns its resuls as an array ref, 
-$matches contains the concrete parsed syntax, i.e. a nested array of arrays of strings. 
+C<$matches> contains the concrete parsed syntax, i.e. a nested array of arrays of strings. 
 
     Dumper($matches) ==> [{'Type' => 'integer'},['kind','\\=',{'Kind' => '8'}]]
 
-You can remove the unlabeled matches using `getParseTree`:
+You can remove the unlabeled matches and convert the raw tree into nested hashes using C<getParseTree>:
 
   my $parse_tree = getParseTree($matches);
 
-    Dumper($parse_tree) ==> [{'Type' => 'integer'},{'Kind' => '8'}]
+    Dumper($parse_tree) ==> {'Type' => 'integer','Kind' => '8'}
 
 =head2 A more complete example
 
@@ -697,8 +727,8 @@ I wrote this library because I needed to parse argument declarations of Fortran-
       real(8), dimension(0:7,kp) :: f,g 
 
 I want to extract the type and kind, the dimension and the list of variable names. For completeness I'm parsing the `intent` attribute as well.
-The parser is a sequence of four separate parsers `type_parser`, `dim_parser`, `intent_parser` and `arglist_parser`.
-All the optional fields are wrapped in a `maybe()`.
+The parser is a sequence of four separate parsers C<type_parser>, C<dim_parser>, C<intent_parser> and C<arglist_parser>.
+All the optional fields are wrapped in a C<maybe()>.
 
 
     my $F95_arg_decl_parser =    
@@ -720,7 +750,7 @@ All the optional fields are wrapped in a `maybe()`.
         &arglist_parser
 	];
 
-# where
+    # where
 
     sub type_parser {	
 		sequence [
@@ -757,23 +787,23 @@ All the optional fields are wrapped in a `maybe()`.
         ]
     }    
 
-Running the parser and calling getParseTree() om the first string results in 
+Running the parser and calling C<getParseTree()> on the first string results in 
 
-    [
-    {'TypeTup' => [
-                {'Type' => 'integer'},
-                {'Kind' => '8'}
-            ]},
-    {'Dim' => ['0:ip','-1:jp+1','kp']},
-    {'Intent' => 'In'},
-    {'Vars' => ['u','v','w']}
-    ]
+    {
+    'TypeTup' => {
+                'Type' => 'integer',
+                'Kind' => '8'
+            },
+    'Dim' => ['0:ip','-1:jp+1','kp'],
+    'Intent' => 'In',
+    'Vars' => ['u','v','w']
+    }
 
 See the test fortran95_argument_declarations.t for the source code.    
 
 =head3 No Monads?!
 
-As this library is inspired by a monadic parser combinator library from Haskell, I have also implemented bindP() and returnP() for those who like monads ^_^
+As this library is inspired by a monadic parser combinator library from Haskell, I have also implemented C<bindP()> and C<returnP()> for those who like monads ^_^
 So instead of saying 
 
     my $pp = sequence [ $p1, $p2, $p3 ]
@@ -814,7 +844,7 @@ it under the same terms as Perl itself.
 
 =head1 SEE ALSO
 
-- The original Parsec library: http://legacy.cs.uu.nl/daan/download/parsec/parsec.html and http://hackage.haskell.org/package/parsec
+- The original Parsec library: L<http://legacy.cs.uu.nl/daan/download/parsec/parsec.html> and L<http://hackage.haskell.org/package/parsec>
 
 =cut
 

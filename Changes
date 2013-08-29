@@ -1,6 +1,8 @@
 Revision history for Parser-Combinators
 
 {{$NEXT}}
+- getParseTree now returns a hash of hashes, for easy access to the parsed data.
+- Fixed README.md minor typographical issues
 
 0.02  2013-08-26 15:35:07 BST
         - Better documentation, renamed some combinators to be the same as in Parsec, fixed bindP/returnP, added more tests
