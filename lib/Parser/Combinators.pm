@@ -1,7 +1,7 @@
 package Parser::Combinators;
 
 use strict;
-use 5.008_005;
+use 5.010;
 our $VERSION = '0.03';
 
 use Exporter 'import';
@@ -39,19 +39,27 @@ $Data::Dumper::Indent=0;
 $Data::Dumper::Terse =1;
 our $V= 0;
 
+# Forward declarations with prototypes
+
+#sub symbol ($);
+#sub char($);
+#sub maybe($);
+#sub sepBy($$);
+#sub oneOf($);
+
+
 # I want to write the parser using lists, because sequencing is the most common operation.
 # So I need a function to generate the actual parser from the lists
 # which is actually a sequence of parsers
 # The first arg is a list ref, the second arg is an optional code ref to process the returned list of matches
-sub sequence {
+sub sequence_ORIG {
     (my $plst, my $proc)=@_;
-    my $gen = sub {
-        (my $str)=@_;
-		print "* sequence($str)\n" if $V;
+    my $gen = sub { (my $str)=@_;
+		say "* sequence( '$str' )" if $V;
         my $matches=[];
         my $st=1;
         my $str2='';
-        my $ms=undef;
+        my $ms=undef; # Why not []?
         for my $p (@{$plst}) {
             if (ref($p) eq 'CODE') {
                 ($st, $str, $ms)=$p->($str);
@@ -73,7 +81,7 @@ sub sequence {
             if( ref($proc) eq 'CODE') {
                 return (1,$str,$proc->($matches));
             } else {
-                print 'TROUBLE: <',Dumper($plst),'><',Dumper($proc),'>' if $V;
+                say 'TROUBLE: <',Dumper($plst),'><',Dumper($proc),'>' if $V;
                 return (1,$str,$matches);
             }
         } else {
@@ -83,16 +91,104 @@ sub sequence {
     return $gen;
 }
 
+sub foldl {
+    (my $f, my $acc, my $ls)=@_;
+    for my $elt (@{$ls}) {
+        $acc = $f->($acc,$elt);
+    }
+    return $acc;
+}
+
+sub sequence {
+    (my $plst, my $proc)=@_;
+    my $gen = sub { (my $str)=@_;
+		say "* sequence( '$str' )" if $V;
+        my $f = sub { (my $acc, my $p) = @_;
+            (my $st1, my $str1, my $matches) = @{ $acc };
+            (my $st2, my $str2, my $ms) = apply($p,$str1);
+#                do {
+#                if (ref($p) eq 'CODE') {
+#                    $p->($str1);
+#                } elsif (ref($p) eq 'HASH') {
+#                    my %hp=%{$p};
+#                    (my $k, my $pp) = each %hp;
+#                    (my $st, my $str, my $mms)=$pp->($str1);
+#                    my $ms = {$k => $mms};
+#                    ($st, $str, $ms)
+#                } else { # assuming it's ARRAY
+#                    die Dumper($p);
+#                    my $p2 = sequence($p);
+#                    $p2->($str1)
+#                }
+#            };
+            if ($st2*$st1==0) {
+                return [0,$str1,[]];
+            } else {	
+                return [1,$str2,[ @{$matches},$ms]];
+            }
+        };     
+        (my $status, my $str, my $matches) = @{  foldl($f, [1,$str,[]],$plst) };
+        if ($status == 0) {
+            return (0,$str,[]);
+        } elsif (defined($proc)) {
+            if( ref($proc) eq 'CODE') {
+                return (1,$str,$proc->($matches));
+            } else {
+                say 'TROUBLE: <',Dumper($plst),'><',Dumper($proc),'>' if $V;
+                return (1,$str,$matches);
+            }
+        } else {
+            return (1,$str,$matches)
+        }
+    };
+    return $gen;
+}
+
+sub sequence_noproc {
+    (my $plst )=@_;
+    my $gen = sub { (my $str)=@_;
+		say "* sequence( '$str' )" if $V;
+        my $f = sub { (my $acc, my $p) = @_;
+            (my $st1, my $str1, my $matches) = @{ $acc };
+            (my $st2, my $str2, my $ms) = do {
+                if (ref($p) eq 'CODE') {
+                    $p->($str1);
+                } elsif (ref($p) eq 'HASH') {
+                    my %hp=%{$p};
+                    (my $k, my $pp) = each %hp;
+                    (my $st, my $str, my $mms)=$pp->($str1);
+                    my $ms = {$k => $mms};
+                    ($st, $str, $ms)
+                } else { # assuming it's ARRAY
+                    my $p2 = sequence($p);
+                    $p2->($str1)
+                }
+            };
+            if ($st2*$st1==0) {
+                return [0,$str1,[]];
+            } else {	
+                return [1,$str2,[ @{$matches},$ms]];
+            }
+        };     
+        (my $status, my $str, my $matches) = @{  foldl($f, [1,$str,[]],$plst) };
+        if ($status == 0) {
+            return (0,$str,[]);
+        } else {
+            return (1,$str,$matches)
+        }
+    };
+    return $gen;
+} 
 # In the best tradition, bind() and return()
 sub bindP {
     (my $p1,my $p2) =@_;
     my $gen = sub {(my $str1) =@_;
-        print "* bindP( \'$str1\' )\n" if $V;
+        say "* bindP( \'$str1\' )" if $V;
         my $matches=undef;
         (my $st1,my $str2,my $m1) = $p1->( $str1 );
         push @{$matches},$m1;
         if ($st1) {
-            print "bind: p1( $str1 ) matched,[$m1] try p2( $str2 )\n";
+            say "bind: p1( $str1 ) matched,[$m1] try p2( $str2 )";
             (my $st2,my $str3, my $m2) = $p2->( $str2 );
            if(ref($m2) eq 'ARRAY' ){
                 $matches =[ @{$matches},@{$m2} ];
@@ -116,25 +212,31 @@ sub returnP {
 }
 
 # Choice: try every parser in the list until one succeeds or return fail.  '<|>' in Parsec
-sub choice {
+# FIXME: Prototype does not guarantee that parens can be omitted. Should make it binary for that.
+sub choice ($$;@) {
     my @parsers=@_;
     my $gen = sub {	(my $str)= @_;
-		print "* choice('$str')\n" if $V;
+		say "* choice('$str')" if $V;
         for my $p (@parsers) {
-            my $status=0; my $matches=[];
-            if (ref($p) eq 'CODE') {
-                ($status, $str, $matches)=$p->($str);
-            } elsif (ref($p) eq 'HASH') {
-                my %hp = %{$p};
-                (my $k, my $pp) = each %hp;
-                ($status, $str, my $mms)=$pp->($str);
-                $matches = {$k => $mms};
-            } else {
-                die Dumper($p);
-            }
+            my $status=0; 
+            my $matches=[];
+            (my $status, $str, my $matches) = apply($p,$str);
+
+#            if (ref($p) eq 'CODE') {
+#                ($status, $str, $matches)=$p->($str);
+#            } elsif (ref($p) eq 'ARRAY') {
+#                ($status, $str, $matches)=sequence($p)->($str);
+#            } elsif (ref($p) eq 'HASH') {
+#                my %hp = %{$p};
+#                (my $k, my $pp) = each %hp;
+#                ($status, $str, my $mms)=$pp->($str);
+#                $matches = {$k => $mms};
+#            } else {
+#                die Dumper($p);
+#            }
             if ($status) {
-                print "choice: remainder => <$str>\n" if $V;
-                print "choice: matches => [".Dumper($matches)."]\n" if $V;
+                say "choice: remainder => <$str>" if $V;
+                say "choice: matches => [".Dumper($matches)."]" if $V;
                 return ($status, $str, $matches);
             }
         }
@@ -147,14 +249,14 @@ sub try {
     (my $p)=@_;
     my $gen = sub {
         (my $str)=@_;
-		print "* try( '$str' )\n" if $V;
+		say "* try( '$str' )" if $V;
         (my $status, my $rest, my $matches)=$p->($str);
         if ($status) {
-            print "try: remainder => <$rest>\n" if $V;
-            print "try: matches => [".Dumper($matches)."]\n" if $V;
+            say "try: remainder => <$rest>" if $V;
+            say "try: matches => [".Dumper($matches)."]" if $V;
             return (1, $rest, $matches);
         } else {
-            print "try: match failed => <$str>\n" if $V;
+            say "try: match failed => <$str>" if $V;
             return (0, $str, $matches);
         }
     };
@@ -163,88 +265,80 @@ sub try {
 
 # maybe() is like try() but always succeeds
 # it returns the matches and the consumed string or the orig string and no matches
-sub maybe {
-    (my $p)=@_;
-    my $gen = sub {
-        (my $str)=@_;
-		print "* maybe('$str')\n" if $V;
-        (my $status, my $rest, my $matches)=$p->($str);
+sub maybe { (my $p)=@_;
+    my $gen = sub { (my $str)=@_;
+		say "* maybe('$str')" if $V;
+#        (my $status, my $rest, my $matches)= do {
+#
+#          if (ref($p) eq 'CODE') {
+#                $p->($str);
+#            } elsif (ref($p) eq 'ARRAY') {
+#                sequence($p)->($str);
+#            } elsif (ref($p) eq 'HASH') {
+#                my %hp = %{$p};
+#                (my $k, my $pp) = each %hp;
+#                (my $status, my $str2, my $mms)=$pp->($str);
+#                my $matches = {$k => $mms};
+#                ($status, $str2, $matches);
+#            } else {
+#                die Dumper($p);
+#            }
+#        };
+        
+        (my $status, my $rest, my $matches)=apply($p,$str);
         if ($status) {
-            print "maybe matches: [".Dumper($matches)."]\n" if $V;
+            say "maybe matches: [".Dumper($matches)."]" if $V;
             return (1, $rest, $matches);
         } else {
-            print "maybe: no matches for <$str>\n" if $V;
+            say "maybe: no matches for <$str>" if $V;
             return (1, $str, undef);
         }
     };
     return $gen;
 }
 
-# Enough rope: this parser will parse whatever the regex is, stripping trailing whitespace
-sub regex {
-    (my $regex_str) = @_;
-    my $gen = sub {	
-        (my $str)=@_;
-        print "* regex( '/$regex_str/', '$str' )\n" if $V;
-        my $matches=undef;
-        if(
-                $str=~s/($regex_str)\s*//
-          ) {
-            my $m=$1;
-            $matches=$m;
-            print "regex: remainder => <$str>\n" if $V;
-            print "regex: matches => [$matches]\n" if $V;
-            return (1,$str, $matches);
-        } else {
-            print "regex: match failed => <$str>\n" if $V;
-        }
-        return (0,$str, $matches); # assumes $status is 0|1, $str is string, $matches is [string]
-    };
-    return $gen;
-}
 
-sub parens {
-    (my $ref)= @_;
+sub parens { (my $p)= @_;
     my $gen = sub {	(my $str)=@_;
-		print "* parens($str)\n" if $V;
+		say "* parens($str)" if $V;
         my $matches=undef;
-        (my $status, my $str, my $ch)=char('(')->($str);
+        (my $status, my $str3, my $ch)=char('(')->($str);
         if ($status==1) {
-            $str=~s/\s*//;
-            (my $st,$str,$matches)=$ref->($str); 
-            print "parens: remainder => <$str>\n" if $V;
-            print "parens: matches => [".Dumper($matches)."]\n" if $V;
+            my $str4 = $str3; $str4=~s/\s*//;
+            (my $st,my $str4s,$matches)=$p->($str4); 
+            say "parens: remainder => <$str4s>" if $V;
+            say "parens: matches => [".Dumper($matches)."]" if $V;
             $status*=$st;
             if ($status==1) {
-                (my $st, $str, my $ch)=char(')')->($str);
-                if ($st==1) {
-                    $str=~s/\s*//;
-                }
+                (my $st, my $str5, my $ch)=char(')')->($str4s);
+#                if ($st==1) {
+#                    $str=~s/\s*//;
+#                }
                 $status*=$st;
                 if ($status==1) { # OK!
-                    print "parens: matches => ".Dumper($matches)."\n" if $V;
-                    return (1,$str, $matches);
+                    my $str6 = $str5; $str6=~s/^\s*//;
+                    say "parens: remainder => <$str5>" if $V;
+                    say "parens: matches => ".Dumper($matches)."" if $V;
+                    return (1,$str6, $matches);
                 } else { # parse failed on closing paren
-                    return (0,$str, $matches);
+                    return (0,$str5, $matches);
                 }
             } else { # parse failed on $ref
-                return (0,$str, $matches);
+                return (0,$str4, $matches);
             }
         } else { # parse failed on opening paren
-            return (0,$str,undef);
+            return (0,$str3,undef);
         }
     };
     return $gen;
 }
 
-sub char {
-    (my $ch)=@_;
-    my $gen =  sub {
-        (my $str)=@_;
-        print "* char('$ch', '$str')\n" if $V;
+sub char { (my $ch)=@_;
+    my $gen =  sub { (my $str)=@_;
+        say "* char('$ch', '$str')" if $V;
         if (substr($str,0,1) eq $ch) {
-            print "char: matched \'$ch\' \n" if $V;
-			print "char: remainder <".substr($str,1).">\n" if $V;
+            say "char: matched \'$ch\' " if $V;
+			say "char: remainder <".substr($str,1).">" if $V;
             return (1,substr($str,1),$ch);
         } else {
             return (0,$str,undef);
@@ -253,34 +347,34 @@ sub char {
     return $gen;
 }
 
-sub sepBy {
-    (my $sep, my $ref)=@_;
+sub sepBy ($$) { (my $sep, my $p)=@_;
     my $gen = sub {	(my $str)=@_;
-		 print "* sepBy('$sep', '$str')\n" if $V;
         my $matches=[];
-        (my $status,$str,my $m)=$ref->($str);
+		say "* sepBy('$sep', '$str')" if $V;
+        (my $status,my $str1,my $m)=$p->($str);
         if ($status) {
             push @{$matches},$m;		
-            print "sepBy: remainder => <$str>\n" if $V;
-            while( do {($status,$str,$m)=char($sep)->($str); 
-                    if ($status) {$str=~s/\s*//;};
-                    $status==1} ) {
-                (my $st,$str,$m)=$ref->($str);
+            say "sepBy: remainder => <$str1>" if $V;
+            ($status,my $str2,$m)=char($sep)->($str1); 
+            while( $status ) {
+                my $str2s=$str2;$str2s=~s/^\s*//;
+                (my $st,my $str3,$m)=$p->($str2s);
                 push @{$matches},$m;
+                ($status,$str2,$m)=char($sep)->($str3); 
             }
-            print "sepBy matches => [".Dumper($matches)."]\n" if $V;
+            say "sepBy matches => [".Dumper($matches)."]" if $V;
+            return (1, $str2, $matches);
         } else { # first match failed. 
-            return (0,$str,undef);
+            return (0,$str1,undef);
         }
-        return (1, $str, $matches);
     };
     return $gen;
 }
 # This is a lexeme parser, so it skips trailing whitespace
+# Should be called "identifier" I think
 sub word {
-    my $gen = sub {	
-        (my $str)=@_;
-		print "* word( '$str' )\n" if $V;
+    my $gen = sub {	(my $str)=@_;
+		say "* word( '$str' )" if $V;
         my $status=0;
         if(
                 $str=~/^(\w+)/ 
@@ -289,21 +383,24 @@ sub word {
             my $matches=$m;
             $status=1;
             $str=~s/^$m\s*//;
-            print "word: remainder => <$str>\n" if $V;
-            print "word: matches => [$matches]\n" if $V;
+            say "word: remainder => <$str>" if $V;
+            say "word: matches => [$matches]" if $V;
             return ($status,$str, $matches);
         } else {
-            print "word: match failed => <$str>\n" if $V;
+            say "word: match failed => <$str>" if $V;
             return ($status,$str, undef); # assumes $status is 0|1, $str is string, $matches is [string]
         }
     };
     return $gen;
 }
+sub identifier {
+    word();
+}   
+
 # matches an unsigned integer
 sub natural {
-    my $gen = sub {	
-        (my $str)=@_;
-        print "* natural( '$str' )\n" if $V;
+    my $gen = sub {	(my $str)=@_;
+        say "* natural( '$str' )" if $V;
         my $status=0;
         if(
                 $str=~/^(\d+)/ 
@@ -312,11 +409,11 @@ sub natural {
             my $matches=$m;
             $status=1;
             $str=~s/^$m\s*//;
-            print "natural: remainder => <$str>\n" if $V;
-            print "natural: matches => [$matches]\n" if $V;
+            say "natural: remainder => <$str>" if $V;
+            say "natural: matches => [$matches]" if $V;
             return ($status,$str, $matches);
         } else {
-            print "natural: match failed => <$str>\n" if $V;
+            say "natural: match failed => <$str>" if $V;
             return ($status,$str, undef); # assumes $status is 0|1, $str is string, $matches is [string]
         }
     };
@@ -324,12 +421,10 @@ sub natural {
 }
 
 # As in Parsec, parses a literal and removes trailing whitespace
-sub symbol {
-    (my $lit_str) = @_;
+sub symbol ($) { (my $lit_str) = @_;
     $lit_str=~s/(\W)/\\$1/g; 
-    my $gen = sub {	
-        (my $str)=@_;
-        print "* symbol( '$lit_str', '$str' )\n" if $V;
+    my $gen = sub {	(my $str)=@_;
+        say "* symbol( '$lit_str', '$str' )" if $V;
         my $status=0;
         if(
                 $str=~/^\s*$lit_str\s*/ 
@@ -338,11 +433,11 @@ sub symbol {
             my $matches=$lit_str;
             $status=1;
             $str=~s/^\s*$lit_str\s*//;
-            print "symbol: remainder => <$str>\n" if $V;
-            print "symbol: matches => [$matches]\n" if $V;
+            say "symbol: remainder => <$str>" if $V;
+            say "symbol: matches => [$matches]" if $V;
             return ($status,$str, $matches);
         } else {
-            print "symbol: match failed => <$str>\n" if $V;
+            say "symbol: match failed => <$str>" if $V;
             return ($status,$str, undef); 
         }
     };
@@ -355,7 +450,7 @@ sub greedyUpto {
     $lit_str=~s/(\W)/\\$1/g; 
     my $gen = sub {	
         (my $str)=@_;
-        print "* greedyUpto( \'$lit_str\', \'$str\' )\n" if $V;
+        say "* greedyUpto( \'$lit_str\', \'$str\' )" if $V;
         if(
                 $str=~/^(.*)\s*$lit_str\s*/ 
           ) {
@@ -363,11 +458,11 @@ sub greedyUpto {
             $m=~s/\s*$//;
             my $matches= $m eq '' ? undef : $m;
             $str=~s/^.*$lit_str\s*//;
-            print "greedyUpto: remainder => <$str>\n" if $V;
-            print "greedyUpto: matches => [$matches]\n" if $V;
+            say "greedyUpto: remainder => <$str>" if $V;
+            say "greedyUpto: matches => [$matches]" if $V;
             return (1,$str, $matches);
         } else {
-            print "greedyUpto: match failed => <$str>\n" if $V;
+            say "greedyUpto: match failed => <$str>" if $V;
             return (0,$str, undef); 
         }
     };
@@ -380,18 +475,18 @@ sub upto {
     $lit_str=~s/(\W)/\\$1/g; 
     my $gen = sub {	
         (my $str)=@_;
-        print "upto1 \'$lit_str\': <$str>\n" if $V;
+        say "upto1 \'$lit_str\': <$str>" if $V;
         if(
                 $str=~/^(.*?)\s*$lit_str\s*/ 
           ) {
             my $m=$1;
             my $matches= $m eq '' ? undef : $m;
             $str=~s/^.*?$lit_str\s*//;
-            print "upto: remainder => <$str>\n" if $V;
-            print "upto: matches => [$matches]\n" if $V;
+            say "upto: remainder => <$str>" if $V;
+            say "upto: matches => [$matches]" if $V;
             return (1,$str, $matches);
         } else {
-            print "upto: match failed => <$str>\n" if $V;
+            say "upto: match failed => <$str>" if $V;
             return (0,$str, undef); 
         }
     };
@@ -400,11 +495,9 @@ sub upto {
 
 
 # `many`, as in Parsec, parses 0 or more the specified parsers
-sub many {
-    (my $parser) = @_;
-    my $gen = sub {
-        (my $str)=@_;
-        print "* many( '$str' )\n" if $V;
+sub many { (my $parser) = @_;
+    my $gen = sub { (my $str)=@_;
+        say "* many( '$str' )" if $V;
         (my $status,$str,my $m)=$parser->($str);
         if ($status) {
             my $matches = [$m];		
@@ -412,11 +505,11 @@ sub many {
                 (my $st,$str,$m)=$parser->($str);
                 push @{$matches},$m;
             }
-            print "many: remainder => <$str>\n" if $V;
-            print "many: matches => [".Dumper($matches)."]\n" if $V;
+            say "many: remainder => <$str>" if $V;
+            say "many: matches => [".Dumper($matches)."]" if $V;
             return (1, $str, $matches);
         } else { # first match failed. 
-            print "many: first match failed => <$str>\n" if $V;
+            say "many: first match failed => <$str>" if $V;
             return (1, $str,undef);
         }
     };
@@ -429,7 +522,7 @@ sub many1 {
     my $gen = sub {
         (my $str)=@_;
         my $matches=[];
-        print "* many( '$str' )\n" if $V;
+        say "* many( '$str' )" if $V;
         (my $status,$str,my $m)=$parser->($str);
         if ($status) {
             push @{$matches},$m;		
@@ -437,10 +530,10 @@ sub many1 {
                 (my $st,$str,$m)=$parser->($str);
                 push @{$matches},$m;
             }
-            print "many: remainder => <$str>\n" if $V;
-            print "many: matches => [".Dumper($matches)."]\n" if $V;
+            say "many: remainder => <$str>" if $V;
+            say "many: matches => [".Dumper($matches)."]" if $V;
         } else { # first match failed. 
-            print "many: first match failed => <$str>\n" if $V;
+            say "many: first match failed => <$str>" if $V;
             return (0, $str,undef);
         }
         return (1, $str, $matches);
@@ -450,12 +543,12 @@ sub many1 {
 
 sub comma {
     my $gen = sub { (my $str) = @_;
-		print "* comma( '$str' )\n" if $V;
+		say "* comma( '$str' )" if $V;
         my $st = ($str=~s/^\s*,\s*//);
         if ($st) {
-            print "comma: match\n" if $V;
+            say "comma: match" if $V;
         } else {
-            print "comma: match failed\n" if $V;
+            say "comma: match failed" if $V;
         }
         return ($st, $str, undef);
     };
@@ -464,7 +557,7 @@ sub comma {
 
 sub semi {
     my $gen = sub { (my $str) = @_;
-		print "* semi( '$str' )\n" if $V;
+		say "* semi( '$str' )" if $V;
         my $st = ($str=~s/^\s*;\s*//);
         return ($st, $str, undef);
     };
@@ -475,9 +568,8 @@ sub semi {
 
 # strip leading whitespace, always success
 sub whiteSpace {
-    my $gen = sub {
-        (my $str)=@_;
-        print "* whiteSpace( \'$str\' )\n" if $V;
+    my $gen = sub { (my $str)=@_;
+        say "* whiteSpace( \'$str\' )" if $V;
         $str=~s/^(\s*)//;	
         my $m=$1;
         return (1,$str,$m)
@@ -485,16 +577,14 @@ sub whiteSpace {
     return $gen;
 }
 
-sub oneOf {
-    (my $patt_lst) = @_;
-    my $gen = sub {
-	(my $str)= @_;
-		print "* oneOf([".join('|',@{$patt_lst})."],'$str')\n" if $V;
+sub oneOf { (my $patt_lst) = @_;
+    my $gen = sub { (my $str)= @_;
+		say "* oneOf([".join('|',@{$patt_lst})."],'$str')" if $V;
         for my $p (@{$patt_lst}) {
             (my $status, $str, my $matches)= symbol($p)->($str);
             if ($status) {
-                print "choice: remainder => <$str>\n" if $V;
-                print "choice: matches => [".Dumper($matches)."]\n" if $V;
+                say "choice: remainder => <$str>" if $V;
+                say "choice: matches => [".Dumper($matches)."]" if $V;
                 return (1, $str, $matches);
             }
         }
@@ -502,6 +592,45 @@ sub oneOf {
     };
     return $gen;
 }
+
+# Enough rope: this parser will parse whatever the regex is, stripping trailing whitespace
+sub regex { (my $regex_str) = @_;
+    my $gen = sub {	(my $str)=@_;
+        say "* regex( '/$regex_str/', '$str' )" if $V;
+        my $matches=undef;
+        if(
+                $str=~s/($regex_str)\s*//
+          ) {
+            my $m=$1;
+            $matches=$m;
+            say "regex: remainder => <$str>" if $V;
+            say "regex: matches => [$matches]" if $V;
+            return (1,$str, $matches);
+        } else {
+            say "regex: match failed => <$str>" if $V;
+        }
+        return (0,$str, $matches); # assumes $status is 0|1, $str is string, $matches is [string]
+    };
+    return $gen;
+}
+
+sub apply { (my $p, my $str) = @_;
+
+    if (ref($p) eq 'CODE') {
+        return $p->($str);
+    } elsif (ref($p) eq 'ARRAY') {
+        return sequence($p)->($str);
+    } elsif (ref($p) eq 'HASH') {
+        my %hp = %{$p};
+        (my $k, my $pp) = each %hp;
+        (my $status, my $str2, my $mms)=$pp->($str);
+        my $matches = {$k => $mms};
+        return ($status, $str2, $matches);
+    } else {
+        die Dumper($p);
+    }
+}
+
 
 sub matches {
 	return @{$_[0]};
@@ -577,6 +706,13 @@ sub l2m { (my $hlist) =@_;
 sub getParseTree { (my $m) =@_;
     return l2m(get_tree_as_lists($m));
 }
+
+sub run {
+    (my $p, my $str) = @_;
+    (my $st, my $rest, my $m) = apply($p,$str);
+    getParseTree($m);
+}
+
 #    return ( (hlist.length==1) ? (head hlist) : hlist) # This just returns 'false' ...
 
 1;

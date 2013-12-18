@@ -37,19 +37,19 @@ my $F95_arg_decl_parser =
     	whiteSpace,
         {TypeTup => &type_parser},
 	    maybe(
-		    sequence [
+		    [
 			    comma,
                 &dim_parser
 	    	], 
     	),
 	    maybe(
-    		sequence [
+    		[
 	    		comma,
 		    	&intent_parser
     		], 
 	    ),
-    	symbol('::'),
-        {Vars => sepBy(',',&word)}
+    	symbol '::' ,
+        {Vars => sepBy ',', word }
 	] 
 ;
 
@@ -58,14 +58,14 @@ my $F95_arg_decl_parser =
 sub type_parser {	
 		sequence [
         {Type =>	word},
-        maybe parens choice(
+        maybe parens choice
                 {Kind => natural},
 						sequence [
 							symbol('kind'),
 							symbol('='),
                             {Kind => natural}
 						] 
-					)        
+					  
 		] 
 }
 
