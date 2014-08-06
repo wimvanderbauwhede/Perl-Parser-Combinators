@@ -375,20 +375,18 @@ sub sepBy ($$) { (my $sep, my $p)=@_;
 sub word {
     my $gen = sub {	(my $str)=@_;
 		say "* word( '$str' )" if $V;
-        my $status=0;
         if(
                 $str=~/^(\w+)/ 
           ) {
             my $m=$1;
             my $matches=$m;
-            $status=1;
             $str=~s/^$m\s*//;
             say "word: remainder => <$str>" if $V;
             say "word: matches => [$matches]" if $V;
-            return ($status,$str, $matches);
+            return (1,$str, $matches);
         } else {
             say "word: match failed => <$str>" if $V;
-            return ($status,$str, undef); # assumes $status is 0|1, $str is string, $matches is [string]
+            return (0,$str, undef); # assumes $status is 0|1, $str is string, $matches is [string]
         }
     };
     return $gen;
@@ -495,26 +493,29 @@ sub upto {
 
 
 # `many`, as in Parsec, parses 0 or more the specified parsers
-sub many { (my $parser) = @_;
-    my $gen = sub { (my $str)=@_;
-        say "* many( '$str' )" if $V;
+sub many {
+    (my $parser) = @_;
+    my $gen = sub {
+        (my $str)=@_;
+        print "* many( '$str' )\n" if $V;
         (my $status,$str,my $m)=$parser->($str);
         if ($status) {
-            my $matches = [$m];		
+            my $matches = [$m];
             while( $status==1 ) {
-                (my $st,$str,$m)=$parser->($str);
+                ($status,$str,$m)=$parser->($str);
                 push @{$matches},$m;
             }
-            say "many: remainder => <$str>" if $V;
-            say "many: matches => [".Dumper($matches)."]" if $V;
+            print "many: remainder => <$str>\n" if $V;
+            print "many: matches => [".Dumper($matches)."]\n" if $V;
             return (1, $str, $matches);
         } else { # first match failed. 
-            say "many: first match failed => <$str>" if $V;
+            print "many: first match failed => <$str>\n" if $V;
             return (1, $str,undef);
         }
     };
     return $gen;
 }
+
 
 # `many1`, as in Parsec, parses 1 or more the specified parsers
 sub many1 {
@@ -527,7 +528,7 @@ sub many1 {
         if ($status) {
             push @{$matches},$m;		
             while( $status==1 ) {
-                (my $st,$str,$m)=$parser->($str);
+                (my $status,$str,$m)=$parser->($str);
                 push @{$matches},$m;
             }
             say "many: remainder => <$str>" if $V;
