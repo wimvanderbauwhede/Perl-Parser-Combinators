@@ -2,7 +2,7 @@ package Parser::Combinators;
 
 use strict;
 use 5.010;
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use Exporter 'import';
 

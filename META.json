@@ -58,6 +58,9 @@
          "web" : "https://github.com/wimvanderbauwhede/Perl-Parser-Combinators"
       }
    },
-   "version" : "0.04"
+   "version" : "0.04",
+   "x_contributors" : [
+      "Wim Vanderbauwhede <Wim.Vanderbauwhede@mail.be>"
+   ]
 }
 
