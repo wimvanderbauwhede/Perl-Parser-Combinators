@@ -10,8 +10,6 @@ Parser::Combinators - A library of building blocks for parsing text
     (my $status, my $rest, my $matches) = $parser->($str);
     my $parse_tree = getParseTree($matches);
 
-
-
 # DESCRIPTION
 
 Parser::Combinators is a library of parser building blocks ('parser combinators'), inspired by the Parsec parser combinator library in Haskell
@@ -74,10 +72,9 @@ The library is not complete in the sense that not all Parsec combinators have be
         word : (\w+)
         natural : (\d+)
         symbol : parses a given symbol, e.g. symbol('int')
-		comma : parses a comma
+                comma : parses a comma
         semi : parses a semicolon
         
-
         char : parses a given character
 
         * Combinators:
@@ -102,22 +99,21 @@ The library is not complete in the sense that not all Parsec combinators have be
 
 You can label any parser in a sequence using an anonymous hash, for example:
 
-    sub type_parser {	
-		sequence [
-        {Type =>	word},
+    sub type_parser {   
+                sequence [
+        {Type =>        word},
         maybe parens choice(
                 {Kind => natural},
-						sequence [
-							symbol('kind'),
-							symbol('='),
+                                                sequence [
+                                                        symbol('kind'),
+                                                        symbol('='),
                             {Kind => natural}
-						] 
-					)        
-		] 
+                                                ] 
+                                        )        
+                ] 
     }
 
 Applying this parser returns a tuple as follows:
-   
 
     my $str = 'integer(kind=8), '
     (my $status, my $rest, my $matches) = type_parser($str);
@@ -132,7 +128,7 @@ You can remove the unlabeled matches and convert the raw tree into nested hashes
 
     my $parse_tree = getParseTree($matches);
 
-    Dumper($parse_tree) ==> {'Type' => 'integer','Kind' => '8'}
+      Dumper($parse_tree) ==> {'Type' => 'integer','Kind' => '8'}
 
 ## A more complete example
 
@@ -146,60 +142,58 @@ I want to extract the type and kind, the dimension and the list of variable name
 The parser is a sequence of four separate parsers `type_parser`, `dim_parser`, `intent_parser` and `arglist_parser`.
 All the optional fields are wrapped in a `maybe()`.
 
-
-
     my $F95_arg_decl_parser =    
     sequence [
-    	whiteSpace,
+        whiteSpace,
         {TypeTup => &type_parser},
-	    maybe(
-		    sequence [
-			    comma,
+            maybe(
+                    sequence [
+                            comma,
                 &dim_parser
-	    	], 
-    	),
-	    maybe(
-    		sequence [
-	    		comma,
-		    	&intent_parser
-    		], 
-	    ),
+                ], 
+        ),
+            maybe(
+                sequence [
+                        comma,
+                        &intent_parser
+                ], 
+            ),
         &arglist_parser
-	];
+        ];
 
     # where
 
-    sub type_parser {	
-		sequence [
-        {Type =>	word},
+    sub type_parser {   
+                sequence [
+        {Type =>        word},
         maybe parens choice(
                 {Kind => natural},
-						sequence [
-							symbol('kind'),
-							symbol('='),
+                                                sequence [
+                                                        symbol('kind'),
+                                                        symbol('='),
                             {Kind => natural}
-						] 
-					)        
-		] 
+                                                ] 
+                                        )        
+                ] 
     }
 
     sub dim_parser {
-		sequence [
-			symbol('dimension'),
+                sequence [
+                        symbol('dimension'),
         {Dim => parens sepBy(',', regex('[^,\)]+')) }
-		] 
+                ] 
     }
 
     sub intent_parser {
-	    sequence [
+            sequence [
             symbol('intent'),
          {Intent => parens word}
-		] 
+                ] 
     }
 
     sub arglist_parser {
         sequence [
-        	symbol('::'),
+                symbol('::'),
             {Vars => sepBy(',',&word)}
         ]
     }    
@@ -226,7 +220,6 @@ So instead of saying
     my $pp = sequence [ $p1, $p2, $p3 ]
 
 you can say
-   
 
     my $pp = bindP( 
         $p1, 
