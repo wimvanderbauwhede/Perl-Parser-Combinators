@@ -122,13 +122,13 @@ Here,`$status` is 0 if the match failed, 1 if it succeeded.  `$rest` contains th
 The actual matches are stored in the array $matches. As every parser returns its resuls as an array ref, 
 `$matches` contains the concrete parsed syntax, i.e. a nested array of arrays of strings. 
 
-    Dumper($matches) ==> [{'Type' => 'integer'},['kind','\\=',{'Kind' => '8'}]]
+    show($matches) ==> [{'Type' => 'integer'},['kind','\\=',{'Kind' => '8'}]]
 
 You can remove the unlabeled matches and convert the raw tree into nested hashes using `getParseTree`:
 
     my $parse_tree = getParseTree($matches);
 
-      Dumper($parse_tree) ==> {'Type' => 'integer','Kind' => '8'}
+      show($parse_tree) ==> {'Type' => 'integer','Kind' => '8'}
 
 ## A more complete example
 

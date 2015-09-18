@@ -35,8 +35,6 @@ use Exporter 'import';
         );
 
 use Data::Dumper;
-$Data::Dumper::Indent=0;
-$Data::Dumper::Terse =1;
 our $V= 0;
 
 # Forward declarations with prototypes
@@ -81,7 +79,7 @@ sub sequence_ORIG {
             if( ref($proc) eq 'CODE') {
                 return (1,$str,$proc->($matches));
             } else {
-                say 'TROUBLE: <',Dumper($plst),'><',Dumper($proc),'>' if $V;
+                say 'TROUBLE: <',show($plst),'><',show($proc),'>' if $V;
                 return (1,$str,$matches);
             }
         } else {
@@ -106,35 +104,20 @@ sub sequence {
         my $f = sub { (my $acc, my $p) = @_;
             (my $st1, my $str1, my $matches) = @{ $acc };
             (my $st2, my $str2, my $ms) = apply($p,$str1);
-#                do {
-#                if (ref($p) eq 'CODE') {
-#                    $p->($str1);
-#                } elsif (ref($p) eq 'HASH') {
-#                    my %hp=%{$p};
-#                    (my $k, my $pp) = each %hp;
-#                    (my $st, my $str, my $mms)=$pp->($str1);
-#                    my $ms = {$k => $mms};
-#                    ($st, $str, $ms)
-#                } else { # assuming it's ARRAY
-#                    die Dumper($p);
-#                    my $p2 = sequence($p);
-#                    $p2->($str1)
-#                }
-#            };
             if ($st2*$st1==0) {
                 return [0,$str1,[]];
             } else {	
                 return [1,$str2,[ @{$matches},$ms]];
             }
         };     
-        (my $status, my $str, my $matches) = @{  foldl($f, [1,$str,[]],$plst) };
+        (my $status, $str, my $matches) = @{  foldl($f, [1,$str,[]],$plst) };
         if ($status == 0) {
             return (0,$str,[]);
         } elsif (defined($proc)) {
             if( ref($proc) eq 'CODE') {
                 return (1,$str,$proc->($matches));
             } else {
-                say 'TROUBLE: <',Dumper($plst),'><',Dumper($proc),'>' if $V;
+                say 'TROUBLE: <',show($plst),'><',show($proc),'>' if $V;
                 return (1,$str,$matches);
             }
         } else {
@@ -170,7 +153,7 @@ sub sequence_noproc {
                 return [1,$str2,[ @{$matches},$ms]];
             }
         };     
-        (my $status, my $str, my $matches) = @{  foldl($f, [1,$str,[]],$plst) };
+        (my $status, $str, my $matches) = @{  foldl($f, [1,$str,[]],$plst) };
         if ($status == 0) {
             return (0,$str,[]);
         } else {
@@ -219,24 +202,10 @@ sub choice ($$;@) {
 		say "* choice('$str')" if $V;
         for my $p (@parsers) {
             my $status=0; 
-            my $matches=[];
-            (my $status, $str, my $matches) = apply($p,$str);
-
-#            if (ref($p) eq 'CODE') {
-#                ($status, $str, $matches)=$p->($str);
-#            } elsif (ref($p) eq 'ARRAY') {
-#                ($status, $str, $matches)=sequence($p)->($str);
-#            } elsif (ref($p) eq 'HASH') {
-#                my %hp = %{$p};
-#                (my $k, my $pp) = each %hp;
-#                ($status, $str, my $mms)=$pp->($str);
-#                $matches = {$k => $mms};
-#            } else {
-#                die Dumper($p);
-#            }
+            ($status, $str, my $matches) = apply($p,$str);
             if ($status) {
                 say "choice: remainder => <$str>" if $V;
-                say "choice: matches => [".Dumper($matches)."]" if $V;
+                say "choice: matches => [".show($matches)."]" if $V;
                 return ($status, $str, $matches);
             }
         }
@@ -253,7 +222,7 @@ sub try {
         (my $status, my $rest, my $matches)=$p->($str);
         if ($status) {
             say "try: remainder => <$rest>" if $V;
-            say "try: matches => [".Dumper($matches)."]" if $V;
+            say "try: matches => [".show($matches)."]" if $V;
             return (1, $rest, $matches);
         } else {
             say "try: match failed => <$str>" if $V;
@@ -267,27 +236,10 @@ sub try {
 # it returns the matches and the consumed string or the orig string and no matches
 sub maybe { (my $p)=@_;
     my $gen = sub { (my $str)=@_;
-		say "* maybe('$str')" if $V;
-#        (my $status, my $rest, my $matches)= do {
-#
-#          if (ref($p) eq 'CODE') {
-#                $p->($str);
-#            } elsif (ref($p) eq 'ARRAY') {
-#                sequence($p)->($str);
-#            } elsif (ref($p) eq 'HASH') {
-#                my %hp = %{$p};
-#                (my $k, my $pp) = each %hp;
-#                (my $status, my $str2, my $mms)=$pp->($str);
-#                my $matches = {$k => $mms};
-#                ($status, $str2, $matches);
-#            } else {
-#                die Dumper($p);
-#            }
-#        };
-        
+		say "* maybe('$str')" if $V;       
         (my $status, my $rest, my $matches)=apply($p,$str);
         if ($status) {
-            say "maybe matches: [".Dumper($matches)."]" if $V;
+            say "maybe matches: [".show($matches)."]" if $V;
             return (1, $rest, $matches);
         } else {
             say "maybe: no matches for <$str>" if $V;
@@ -307,7 +259,7 @@ sub parens { (my $p)= @_;
             my $str4 = $str3; $str4=~s/\s*//;
             (my $st,my $str4s,$matches)=$p->($str4); 
             say "parens: remainder => <$str4s>" if $V;
-            say "parens: matches => [".Dumper($matches)."]" if $V;
+            say "parens: matches => [".show($matches)."]" if $V;
             $status*=$st;
             if ($status==1) {
                 (my $st, my $str5, my $ch)=char(')')->($str4s);
@@ -318,7 +270,7 @@ sub parens { (my $p)= @_;
                 if ($status==1) { # OK!
                     my $str6 = $str5; $str6=~s/^\s*//;
                     say "parens: remainder => <$str5>" if $V;
-                    say "parens: matches => ".Dumper($matches)."" if $V;
+                    say "parens: matches => ".show($matches)."" if $V;
                     return (1,$str6, $matches);
                 } else { # parse failed on closing paren
                     return (0,$str5, $matches);
@@ -362,7 +314,7 @@ sub sepBy ($$) { (my $sep, my $p)=@_;
                 push @{$matches},$m;
                 ($status,$str2,$m)=char($sep)->($str3); 
             }
-            say "sepBy matches => [".Dumper($matches)."]" if $V;
+            say "sepBy matches => [".show($matches)."]" if $V;
             return (1, $str2, $matches);
         } else { # first match failed. 
             return (0,$str1,undef);
@@ -506,7 +458,7 @@ sub many {
                 push @{$matches},$m;
             }
             print "many: remainder => <$str>\n" if $V;
-            print "many: matches => [".Dumper($matches)."]\n" if $V;
+            print "many: matches => [".show($matches)."]\n" if $V;
             return (1, $str, $matches);
         } else { # first match failed. 
             print "many: first match failed => <$str>\n" if $V;
@@ -532,7 +484,7 @@ sub many1 {
                 push @{$matches},$m;
             }
             say "many: remainder => <$str>" if $V;
-            say "many: matches => [".Dumper($matches)."]" if $V;
+            say "many: matches => [".show($matches)."]" if $V;
         } else { # first match failed. 
             say "many: first match failed => <$str>" if $V;
             return (0, $str,undef);
@@ -585,7 +537,7 @@ sub oneOf { (my $patt_lst) = @_;
             (my $status, $str, my $matches)= symbol($p)->($str);
             if ($status) {
                 say "choice: remainder => <$str>" if $V;
-                say "choice: matches => [".Dumper($matches)."]" if $V;
+                say "choice: matches => [".show($matches)."]" if $V;
                 return (1, $str, $matches);
             }
         }
@@ -628,7 +580,7 @@ sub apply { (my $p, my $str) = @_;
         my $matches = {$k => $mms};
         return ($status, $str2, $matches);
     } else {
-        die Dumper($p);
+        die show($p);
     }
 }
 
@@ -714,7 +666,11 @@ sub run {
     getParseTree($m);
 }
 
-#    return ( (hlist.length==1) ? (head hlist) : hlist) # This just returns 'false' ...
+sub show {  (my $data)=@_;
+    $Data::Dumper::Indent=0;
+    $Data::Dumper::Terse =1;    
+    return Dumper($data);
+}
 
 1;
 
@@ -847,13 +803,13 @@ Here,C<$status> is 0 if the match failed, 1 if it succeeded.  C<$rest> contains 
 The actual matches are stored in the array $matches. As every parser returns its resuls as an array ref, 
 C<$matches> contains the concrete parsed syntax, i.e. a nested array of arrays of strings. 
 
-    Dumper($matches) ==> [{'Type' => 'integer'},['kind','\\=',{'Kind' => '8'}]]
+    show($matches) ==> [{'Type' => 'integer'},['kind','\\=',{'Kind' => '8'}]]
 
 You can remove the unlabeled matches and convert the raw tree into nested hashes using C<getParseTree>:
 
   my $parse_tree = getParseTree($matches);
 
-    Dumper($parse_tree) ==> {'Type' => 'integer','Kind' => '8'}
+    show($parse_tree) ==> {'Type' => 'integer','Kind' => '8'}
 
 =head2 A more complete example
 
