@@ -1,6 +1,8 @@
 Revision history for Parser-Combinators
 
 {{$NEXT}}
+
+0.05  2015-09-18 13:22:46 BST
         - Factored out Data::Dumper into show()
 0.04  2015-09-17 14:44:34 BST
         - Fixed hash comparison using is_deeply() rather than Dumper()
