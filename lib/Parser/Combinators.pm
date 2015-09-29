@@ -24,10 +24,11 @@ use Exporter 'import';
         many
         many1
         whiteSpace
-		comma
-		matches
-		unwrap
-		empty
+        comma
+        semi
+        matches
+        unwrap
+        empty
         getParseTree
         bindP
         returnP
